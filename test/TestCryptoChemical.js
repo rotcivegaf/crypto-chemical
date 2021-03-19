@@ -5,6 +5,7 @@ const {
   toEvents,
   tryCatchRevert,
   address0x,
+  bn,
   random32bn,
 } = require('./Helper.js');
 
@@ -20,6 +21,16 @@ contract('CryptoChemical', (accounts) => {
     cryptoChemical = await CryptoChemical.new('', { from: owner });
     await cryptoChemical.setManager(manager, { from: owner });
   });
+
+  function getMsgHash (to, amount, expiry, salt) {
+    return web3.utils.soliditySha3(
+      { t: 'address', v: cryptoChemical.address },
+      { t: 'address', v: to },
+      { t: 'uint256', v: amount },
+      { t: 'uint256', v: expiry },
+      { t: 'uint256', v: salt },
+    );
+  }
 
   it('Function Constructor', async () => {
     const uri = 'test cryptoChemical';
@@ -87,6 +98,116 @@ contract('CryptoChemical', (accounts) => {
     expect(postAmounts[1]).to.eq.BN(prevBal[1].sub(amounts[1]));
     expect(postAmounts[2]).to.eq.BN(prevBal[2].sub(amounts[2]));
   });
+  it('Function cancelSignHash', async () => {
+    const msgHash = await getMsgHash(beneficiary, random32bn(), random32bn(), random32bn());
+
+    await toEvents(
+      cryptoChemical.cancelSignHash(
+        msgHash,
+        { from: owner },
+      ),
+      'CancelHash',
+    );
+
+    assert.isTrue(await cryptoChemical.canceledMsgHashes(msgHash));
+  });
+  describe('Function signMintEnergy', () => {
+    it('Mint energy with signature', async () => {
+      const mintAmount = bn(100);
+      const expiry = bn('9999999999999999999999999');
+      const salt = random32bn();
+      const msgHash = await getMsgHash(beneficiary, mintAmount, expiry, salt);
+      const signature = await web3.eth.sign(msgHash, owner);
+
+      const prevBeneficiaryAmount = await cryptoChemical.balanceOf(beneficiary);
+
+      await toEvents(
+        cryptoChemical.signMintEnergy(
+          beneficiary,
+          mintAmount,
+          expiry,
+          salt,
+          signature,
+          { from: beneficiary },
+        ),
+        'SignMintEnergy',
+      );
+
+      expect(await cryptoChemical.balanceOf(beneficiary)).to.eq.BN(prevBeneficiaryAmount.add(mintAmount));
+      assert.isTrue(await cryptoChemical.canceledMsgHashes(msgHash));
+    });
+    it('Try mint energy with expired signature', async () => {
+      await tryCatchRevert(
+        () => cryptoChemical.signMintEnergy(
+          beneficiary,
+          1,
+          0,
+          1,
+          [],
+          { from: beneficiary },
+        ),
+        'signMintEnergy: The signature has expired',
+      );
+    });
+    it('Try mint energy with cancel hash', async () => {
+      const mintAmount = bn(100);
+      const expiry = bn('9999999999999999999999999');
+      const salt = random32bn();
+      const msgHash = await getMsgHash(beneficiary, mintAmount, expiry, salt);
+      const signature = await web3.eth.sign(msgHash, owner);
+
+      await cryptoChemical.cancelSignHash(msgHash, { from: owner });
+
+      await tryCatchRevert(
+        () => cryptoChemical.signMintEnergy(
+          beneficiary,
+          mintAmount,
+          expiry,
+          salt,
+          signature,
+          { from: beneficiary },
+        ),
+        'signMintEnergy: The signature was canceled',
+      );
+    });
+    it('Try mint energy with wrong signature', async () => {
+      const mintAmount = bn(100);
+      const expiry = bn('9999999999999999999999999');
+      const salt = random32bn();
+      const msgHash = await getMsgHash(beneficiary, mintAmount, expiry, salt);
+      const signature = await web3.eth.sign(msgHash, owner);
+
+      await cryptoChemical.cancelSignHash(msgHash, { from: owner });
+
+      await tryCatchRevert(
+        () => cryptoChemical.signMintEnergy(
+          beneficiary,
+          mintAmount.add(bn(9)),
+          expiry,
+          salt,
+          signature,
+          { from: beneficiary },
+        ),
+        'signMintEnergy: Invalid owner signature',
+      );
+
+      const saltUser = random32bn();
+      const msgHashUser = await getMsgHash(beneficiary, mintAmount, expiry, saltUser);
+      const signatureUser = await web3.eth.sign(msgHashUser, beneficiary);
+
+      await tryCatchRevert(
+        () => cryptoChemical.signMintEnergy(
+          beneficiary,
+          mintAmount,
+          expiry,
+          saltUser,
+          signatureUser,
+          { from: owner },
+        ),
+        'signMintEnergy: Invalid owner signature',
+      );
+    });
+  });
   describe('OnlyOwner functions', () => {
     it('setURI', async () => {
       await tryCatchRevert(
@@ -111,6 +232,17 @@ contract('CryptoChemical', (accounts) => {
         () => cryptoChemical.mintEnergy(
           notOwner,
           1,
+          { from: notOwner },
+        ),
+        'Ownable: caller is not the owner',
+      );
+    });
+    it('cancelSignHash', async () => {
+      const msgHash = await getMsgHash(beneficiary, random32bn(), random32bn(), random32bn());
+
+      await tryCatchRevert(
+        () => cryptoChemical.cancelSignHash(
+          msgHash,
           { from: notOwner },
         ),
         'Ownable: caller is not the owner',
