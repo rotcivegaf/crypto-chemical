@@ -55,7 +55,7 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         canceledMsgHashes[msgHash] = true;
 
         require(
-            owner() == recoveryOwner(msgHash, _ownerSignature),
+            owner() == _recoveryOwner(msgHash, _ownerSignature),
             "signMintEnergy: Invalid owner signature"
         );
 
@@ -102,7 +102,7 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         _burnBatch(_to, _ids, _amounts);
     }
 
-    function recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {
+    function _recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {
         bytes32 r;
         bytes32 s;
         uint8 v;

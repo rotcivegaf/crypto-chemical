@@ -64,7 +64,7 @@ contract ManagerV1 is Ownable, IManager {
     ) internal {
         require(_id < START_ATOMS_IDS, "mintMats: Should be a mat");
 
-        cryptoChemical.mint(_to, _id, _amount, '');
+        cryptoChemical.mint(_to, _id, _amount, "");
     }
 
     function mintMats(
@@ -104,7 +104,7 @@ contract ManagerV1 is Ownable, IManager {
         canceledMsgHashes[msgHash] = true;
 
         require(
-            owner() == recoveryOwner(msgHash, _ownerSignature),
+            owner() == _recoveryOwner(msgHash, _ownerSignature),
             "signMintMats: Invalid owner signature"
         );
 
@@ -122,7 +122,7 @@ contract ManagerV1 is Ownable, IManager {
         for (uint256 i = 0; i < idsLength; ++i)
             require(_ids[i] < START_ATOMS_IDS, "mintBatchMats: Should be a mat");
 
-        cryptoChemical.mintBatch(_to, _ids, _amounts, '');
+        cryptoChemical.mintBatch(_to, _ids, _amounts, "");
     }
 
     function mintBatchMats(
@@ -162,7 +162,7 @@ contract ManagerV1 is Ownable, IManager {
         canceledMsgHashes[msgHash] = true;
 
         require(
-            owner() == recoveryOwner(msgHash, _ownerSignature),
+            owner() == _recoveryOwner(msgHash, _ownerSignature),
             "signMintBatchMats: Invalid owner signature"
         );
 
@@ -196,10 +196,10 @@ contract ManagerV1 is Ownable, IManager {
             address(this),
             MATS_IDS,
             amounts,
-            ''
+            ""
         );
 
-        cryptoChemical.mint(_to, _atomId, _amount, '');
+        cryptoChemical.mint(_to, _atomId, _amount, "");
 
         emit MintAtoms();
     }
@@ -241,10 +241,10 @@ contract ManagerV1 is Ownable, IManager {
             address(this),
             MATS_IDS,
             amounts,
-            ''
+            ""
         );
 
-        cryptoChemical.mintBatch(_to, _atomsIds, _amounts, '');
+        cryptoChemical.mintBatch(_to, _atomsIds, _amounts, "");
 
         emit MintBatchAtoms();
     }
@@ -277,7 +277,7 @@ contract ManagerV1 is Ownable, IManager {
             _to,
             MATS_IDS,
             amounts,
-            ''
+            ""
         );
 
         emit BurnAtoms();
@@ -288,6 +288,8 @@ contract ManagerV1 is Ownable, IManager {
         uint256[] memory _ids,
         uint256[] memory _amounts
     ) external {
+        // TODO
+
         emit BurnBatchAtoms();
     }
 
@@ -332,7 +334,7 @@ contract ManagerV1 is Ownable, IManager {
         return 0xbc197c81;
     }
 
-    function recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {
+    function _recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {
         bytes32 r;
         bytes32 s;
         uint8 v;
