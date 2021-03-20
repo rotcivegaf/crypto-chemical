@@ -538,7 +538,7 @@ contract('ManagerV1', (accounts) => {
         'ERC20: transfer amount exceeds balance',
       );
 
-      await cryptoChemical.burnBatch(user, matIds, amounts, { from: user });
+      await managerV1.burnBatch(matIds, amounts, { from: user });
     });
     it('Try Mint atom without neutrons', async () => {
       const atomicNumber = bn(5);
@@ -563,7 +563,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, energyNeutron.energy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, amounts, { from: user });
+      await managerV1.burnBatch(matIds, amounts, { from: user });
     });
     it('Try Mint atom without protons', async () => {
       const atomicNumber = bn(5);
@@ -588,7 +588,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, energyNeutron.energy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, amounts, { from: user });
+      await managerV1.burnBatch(matIds, amounts, { from: user });
     });
     it('Try Mint atom without electrons', async () => {
       const atomicNumber = bn(5);
@@ -613,7 +613,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, energyNeutron.energy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, amounts, { from: user });
+      await managerV1.burnBatch(matIds, amounts, { from: user });
     });
   });
   describe('Function mintBatchAtoms', () => {
@@ -726,7 +726,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, totEnergy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, matAmounts, { from: user });
+      await managerV1.burnBatch(matIds, matAmounts, { from: user });
     });
     it('Try Mint atom without neutrons', async () => {
       const ids = [bn(5), bn(7), bn(25), bn(100), bn(23), bn(118)];
@@ -764,7 +764,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, totEnergy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, matAmounts, { from: user });
+      await managerV1.burnBatch(matIds, matAmounts, { from: user });
     });
     it('Try Mint atom without protons', async () => {
       const ids = [bn(5), bn(7), bn(25), bn(100), bn(23), bn(118)];
@@ -802,7 +802,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, totEnergy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, matAmounts, { from: user });
+      await managerV1.burnBatch(matIds, matAmounts, { from: user });
     });
     it('Try Mint atom without electrons', async () => {
       const ids = [bn(5), bn(7), bn(25), bn(100), bn(23), bn(118)];
@@ -840,7 +840,7 @@ contract('ManagerV1', (accounts) => {
       );
 
       await cryptoChemical.transfer(burnAddress, totEnergy, { from: user });
-      await cryptoChemical.burnBatch(user, matIds, matAmounts, { from: user });
+      await managerV1.burnBatch(matIds, matAmounts, { from: user });
     });
   });
   describe('Function burnAtoms', () => {
@@ -860,10 +860,11 @@ contract('ManagerV1', (accounts) => {
       await managerV1.mintBatchMats(user, matIds, amounts, { from: owner });
       // Mint atoms
       await managerV1.mintAtoms(user, atomId, mintAmount, { from: user });
-      // Mint energy for burn
+
+      // Mint energy
       const energyNeutronBurn = await managerV1.getEnergyNeutron(BASE_ENERGY_BURN_ATOM, atomId);
-      await cryptoChemical.mintEnergy(user, energyNeutronBurn.energy.mul(burnAmount).div(bn(2)), { from: owner });
-      await cryptoChemical.approve(managerV1.address, energyNeutronBurn.energy.mul(burnAmount).div(bn(2)), { from: user });
+      await cryptoChemical.mintEnergy(user, energyNeutronBurn.energy.div(bn(2)).mul(burnAmount), { from: owner });
+      await cryptoChemical.approve(managerV1.address, energyNeutronBurn.energy.div(bn(2)).mul(burnAmount), { from: user });
 
       // Save balances
       const prevUserEnergy = await cryptoChemical.balanceOf(user);
@@ -871,7 +872,6 @@ contract('ManagerV1', (accounts) => {
 
       await toEvents(
         managerV1.burnAtoms(
-          user,
           beneficiary,
           atomId,
           burnAmount,
@@ -892,10 +892,9 @@ contract('ManagerV1', (accounts) => {
     it('Try burn another id', async () => {
       await tryCatchRevert(
         () => managerV1.burnAtoms(
-          user,
           beneficiary,
           START_ATOMS_IDS.sub(bn(1)),
-          END_ATOMS_IDS,
+          100,
           { from: user },
         ),
         'mintAtoms: Should be an atom',
@@ -903,6 +902,248 @@ contract('ManagerV1', (accounts) => {
     });
   });
   describe('Function burnBatchAtoms', () => {
-    // TODO
+    it('Burn a batch of atoms', async () => {
+      const ids = [bn(5), bn(7), bn(25), bn(100), bn(23), bn(118)];
+      const amounts = [bn(100), bn(1), bn(6), bn(50), bn(33), bn(0)];
+      let totEnergy = bn(0);
+      let totNeutron = bn(0);
+      let totElecPro = bn(0);
+
+      for (let i = 0; i < ids.length; i++) {
+        const energyNeutron = await managerV1.getEnergyNeutron(BASE_ENERGY_MINT_ATOM, ids[i]);
+        const atomicNumber = bn(ids[i]).sub(START_ATOMS_IDS).add(bn(1));
+
+        totEnergy = totEnergy.add(energyNeutron.energy.mul(amounts[i]));
+        totNeutron = totNeutron.add(energyNeutron.neutron.mul(amounts[i]));
+        totElecPro = totElecPro.add(atomicNumber.mul(amounts[i]));
+      }
+
+      // Mint energy
+      await cryptoChemical.mintEnergy(user, totEnergy, { from: owner });
+      await cryptoChemical.approve(managerV1.address, totEnergy, { from: user });
+
+      // Mint mats
+      const matIds = [bn(0), bn(1), bn(2)];
+      const matAmounts = [totNeutron, totElecPro, totElecPro];
+      await managerV1.mintBatchMats(user, matIds, matAmounts, { from: owner });
+
+      // Mint atoms
+      await managerV1.mintBatchAtoms(user, ids, amounts, { from: user });
+
+      totEnergy = bn(0);
+
+      for (let i = 0; i < ids.length; i++) {
+        const energyNeutron = await managerV1.getEnergyNeutron(BASE_ENERGY_MINT_ATOM, ids[i]);
+
+        totEnergy = totEnergy.add(energyNeutron.energy.mul(amounts[i]).div(bn(2)));
+      }
+
+      // Mint energy
+      await cryptoChemical.mintEnergy(user, totEnergy, { from: owner });
+      await cryptoChemical.approve(managerV1.address, totEnergy, { from: user });
+
+      // Save balances
+      const prevUserEnergy = await cryptoChemical.balanceOf(user);
+      const prevAmounts = await cryptoChemical.balanceOfBatch([beneficiary, beneficiary, beneficiary], [0, 1, 2]);
+
+      const userArray = [];
+      for (let i = 0; i < ids.length; i++) {
+        userArray.push(user);
+      }
+      const prevAmountsUser = await cryptoChemical.balanceOfBatch(userArray, ids);
+
+      await toEvents(
+        managerV1.burnBatchAtoms(
+          beneficiary,
+          ids,
+          amounts,
+          { from: user },
+        ),
+        'BurnBatchAtoms',
+      );
+
+      expect(await cryptoChemical.balanceOf(user)).to.eq.BN(prevUserEnergy.sub(totEnergy));
+
+      expect(await cryptoChemical.balanceOf(beneficiary, 0)).to.eq.BN(prevAmounts[0].add(totNeutron));
+      expect(await cryptoChemical.balanceOf(beneficiary, 1)).to.eq.BN(prevAmounts[1].add(totElecPro));
+      expect(await cryptoChemical.balanceOf(beneficiary, 2)).to.eq.BN(prevAmounts[2].add(totElecPro));
+
+      const postAmountsUser = await cryptoChemical.balanceOfBatch(userArray, ids);
+      for (let i = 0; i < ids.length; i++) {
+        expect(postAmountsUser[i]).to.eq.BN(prevAmountsUser[i].sub(amounts[i]));
+      }
+    });
+    it('Try another id', async () => {
+      await tryCatchRevert(
+        () => managerV1.burnBatchAtoms(
+          address0x,
+          [bn(7), END_ATOMS_IDS],
+          [bn(0), bn(0)],
+        ),
+        'burnBatchAtoms: Should be an atom',
+      );
+      await tryCatchRevert(
+        () => managerV1.burnBatchAtoms(
+          address0x,
+          [bn(7), START_ATOMS_IDS.sub(bn(1))],
+          [bn(0), bn(0)],
+        ),
+        'burnBatchAtoms: Should be an atom',
+      );
+    });
+    it('Try burn atom without energy', async () => {
+      const ids = [bn(5)];
+      const amounts = [bn(100)];
+      let totEnergy = bn(0);
+      let totNeutron = bn(0);
+      let totElecPro = bn(0);
+
+      for (let i = 0; i < ids.length; i++) {
+        const energyNeutron = await managerV1.getEnergyNeutron(BASE_ENERGY_MINT_ATOM, ids[i]);
+        const atomicNumber = bn(ids[i]).sub(START_ATOMS_IDS).add(bn(1));
+
+        totEnergy = totEnergy.add(energyNeutron.energy.mul(amounts[i]));
+        totNeutron = totNeutron.add(energyNeutron.neutron.mul(amounts[i]));
+        totElecPro = totElecPro.add(atomicNumber.mul(amounts[i]));
+      }
+
+      // Mint energy
+      await cryptoChemical.mintEnergy(user, totEnergy, { from: owner });
+      await cryptoChemical.approve(managerV1.address, totEnergy, { from: user });
+
+      // Mint mats
+      const matIds = [bn(0), bn(1), bn(2)];
+      const matAmounts = [totNeutron, totElecPro, totElecPro];
+      await managerV1.mintBatchMats(user, matIds, matAmounts, { from: owner });
+
+      // Mint atoms
+      await managerV1.mintBatchAtoms(user, ids, amounts, { from: user });
+
+      totEnergy = bn(0);
+
+      for (let i = 0; i < ids.length; i++) {
+        const energyNeutron = await managerV1.getEnergyNeutron(BASE_ENERGY_MINT_ATOM, ids[i]);
+
+        totEnergy = totEnergy.add(energyNeutron.energy.mul(amounts[i]).div(bn(2)));
+      }
+
+      // Mint energy
+      await cryptoChemical.mintEnergy(user, totEnergy, { from: owner });
+
+      await tryCatchRevert(
+        () => managerV1.burnBatchAtoms(
+          beneficiary,
+          ids,
+          amounts,
+          { from: user },
+        ),
+        'ERC20: transfer amount exceeds allowance',
+      );
+
+      await cryptoChemical.transfer(burnAddress, totEnergy, { from: user });
+    });
+  });
+  describe('Function burn', () => {
+    it('Burn', async () => {
+      const atomId = bn(100);
+      const mintAmount = bn(33);
+      const burnAmount = bn(3);
+
+      const energyNeutron = await managerV1.getEnergyNeutron(BASE_ENERGY_MINT_ATOM, atomId);
+      const atomicNumber = bn(atomId).sub(START_ATOMS_IDS).add(bn(1));
+      // Mint energy
+      await cryptoChemical.mintEnergy(user, energyNeutron.energy.mul(mintAmount), { from: owner });
+      await cryptoChemical.approve(managerV1.address, energyNeutron.energy.mul(mintAmount), { from: user });
+      // Mint mats
+      const matIds = [bn(0), bn(1), bn(2)];
+      const amounts = [energyNeutron.neutron.mul(mintAmount), atomicNumber.mul(mintAmount), atomicNumber.mul(mintAmount)];
+      await managerV1.mintBatchMats(user, matIds, amounts, { from: owner });
+      // Mint atoms
+      await managerV1.mintAtoms(user, atomId, mintAmount, { from: user });
+
+      // Save balance
+      const prevAmounts = await cryptoChemical.balanceOf(user, atomId);
+
+      await toEvents(
+        managerV1.burn(
+          atomId,
+          burnAmount,
+          { from: user },
+        ),
+        'Burn',
+      );
+
+      expect(await cryptoChemical.balanceOf(user, atomId)).to.eq.BN(prevAmounts.sub(burnAmount));
+    });
+    it('Try burn', async () => {
+      await tryCatchRevert(
+        () => managerV1.burn(
+          1111111,
+          111,
+          { from: user },
+        ),
+        'ERC1155: burn amount exceeds balance',
+      );
+    });
+  });
+  describe('Function burnBatch', () => {
+    it('Burn a batch of atoms', async () => {
+      const ids = [bn(5), bn(7), bn(25), bn(100), bn(23), bn(118)];
+      const amounts = [bn(100), bn(1), bn(6), bn(50), bn(33), bn(0)];
+      let totEnergy = bn(0);
+      let totNeutron = bn(0);
+      let totElecPro = bn(0);
+
+      for (let i = 0; i < ids.length; i++) {
+        const energyNeutron = await managerV1.getEnergyNeutron(BASE_ENERGY_MINT_ATOM, ids[i]);
+        const atomicNumber = bn(ids[i]).sub(START_ATOMS_IDS).add(bn(1));
+
+        totEnergy = totEnergy.add(energyNeutron.energy.mul(amounts[i]));
+        totNeutron = totNeutron.add(energyNeutron.neutron.mul(amounts[i]));
+        totElecPro = totElecPro.add(atomicNumber.mul(amounts[i]));
+      }
+
+      // Mint energy
+      await cryptoChemical.mintEnergy(user, totEnergy, { from: owner });
+      await cryptoChemical.approve(managerV1.address, totEnergy, { from: user });
+
+      // Mint mats
+      const matIds = [bn(0), bn(1), bn(2)];
+      const matAmounts = [totNeutron, totElecPro, totElecPro];
+      await managerV1.mintBatchMats(user, matIds, matAmounts, { from: owner });
+
+      // Mint atoms
+      await managerV1.mintBatchAtoms(user, ids, amounts, { from: user });
+
+      // Save balances
+      const userArray = [];
+      for (let i = 0; i < ids.length; i++) {
+        userArray.push(user);
+      }
+      const prevAmountsUser = await cryptoChemical.balanceOfBatch(userArray, ids);
+
+      await toEvents(
+        managerV1.burnBatch(
+          ids,
+          amounts,
+          { from: user },
+        ),
+        'BurnBatch',
+      );
+
+      const postAmountsUser = await cryptoChemical.balanceOfBatch(userArray, ids);
+      for (let i = 0; i < ids.length; i++) {
+        expect(postAmountsUser[i]).to.eq.BN(prevAmountsUser[i].sub(amounts[i]));
+      }
+    });
+    it('Try burnBatch', async () => {
+      await tryCatchRevert(
+        () => managerV1.burnBatch(
+          [561651651, 999999999],
+          [bn(10), bn(0)],
+        ),
+        'ERC1155: burn amount exceeds balance',
+      );
+    });
   });
 });

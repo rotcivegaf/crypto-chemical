@@ -70,7 +70,7 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         uint256 _amount,
         bytes memory _data
     ) external {
-        require(msg.sender == manager, "mint: Only the manager can mint");
+        require(msg.sender == manager, "mint: Only the manager");
 
         _mint(_to, _id, _amount, _data);
     }
@@ -81,25 +81,29 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         uint256[] memory _amounts,
         bytes memory _data
     ) external {
-        require(msg.sender == manager, "mintBatch: Only the manager can mint");
+        require(msg.sender == manager, "mintBatch: Only the manager");
 
         _mintBatch(_to, _ids, _amounts, _data);
     }
 
     function burn(
-        address _to,
+        address _account,
         uint256 _id,
         uint256 _amount
     ) external {
-        _burn(_to, _id, _amount);
+        require(msg.sender == manager, "burn: Only the manager");
+
+        _burn(_account, _id, _amount);
     }
 
     function burnBatch(
-        address _to,
+        address _account,
         uint256[] memory _ids,
         uint256[] memory _amounts
     ) external {
-        _burnBatch(_to, _ids, _amounts);
+        require(msg.sender == manager, "burnBatch: Only the manager");
+
+        _burnBatch(_account, _ids, _amounts);
     }
 
     function _recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {

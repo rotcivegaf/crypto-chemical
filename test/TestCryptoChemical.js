@@ -60,44 +60,6 @@ contract('CryptoChemical', (accounts) => {
 
     expect(await cryptoChemical.balanceOf(beneficiary)).to.eq.BN(prevBal.add(amount));
   });
-  it('Function burn', async () => {
-    const id = random32bn();
-    const amount = random32bn();
-
-    await cryptoChemical.mint(beneficiary, id, amount, [], { from: manager });
-
-    const prevBal = await cryptoChemical.balanceOf(beneficiary, id);
-
-    await cryptoChemical.burn(
-      beneficiary,
-      id,
-      amount,
-      { from: manager },
-    );
-
-    expect(await cryptoChemical.balanceOf(beneficiary, id)).to.eq.BN(prevBal.sub(amount));
-  });
-  it('Function burnBatch', async () => {
-    const ids = [random32bn(), random32bn(), random32bn()];
-    const amounts = [random32bn(), random32bn(), random32bn()];
-
-    await cryptoChemical.mintBatch(beneficiary, ids, amounts, [], { from: manager });
-
-    const beneficiaryArray = [beneficiary, beneficiary, beneficiary];
-    const prevBal = await cryptoChemical.balanceOfBatch(beneficiaryArray, ids);
-
-    await cryptoChemical.burnBatch(
-      beneficiary,
-      ids,
-      amounts,
-      { from: manager },
-    );
-
-    const postAmounts = await cryptoChemical.balanceOfBatch(beneficiaryArray, ids);
-    expect(postAmounts[0]).to.eq.BN(prevBal[0].sub(amounts[0]));
-    expect(postAmounts[1]).to.eq.BN(prevBal[1].sub(amounts[1]));
-    expect(postAmounts[2]).to.eq.BN(prevBal[2].sub(amounts[2]));
-  });
   it('Function cancelSignHash', async () => {
     const msgHash = await getMsgHash(beneficiary, random32bn(), random32bn(), random32bn());
 
@@ -301,7 +263,7 @@ contract('CryptoChemical', (accounts) => {
           [],
           { from: owner },
         ),
-        'mint: Only the manager can mint',
+        'mint: Only the manager',
       );
     });
   });
@@ -335,7 +297,81 @@ contract('CryptoChemical', (accounts) => {
           [],
           { from: owner },
         ),
-        'mintBatch: Only the manager can mint',
+        'mintBatch: Only the manager',
+      );
+    });
+  });
+  describe('Function burn', () => {
+    it('Function burn', async () => {
+      const id = random32bn();
+      const amount = random32bn();
+
+      await cryptoChemical.mint(beneficiary, id, amount, [], { from: manager });
+
+      const prevBal = await cryptoChemical.balanceOf(beneficiary, id);
+
+      await cryptoChemical.burn(
+        beneficiary,
+        id,
+        amount,
+        { from: manager },
+      );
+
+      expect(await cryptoChemical.balanceOf(beneficiary, id)).to.eq.BN(prevBal.sub(amount));
+    });
+    it('Try burn without being the manager', async () => {
+      const id = random32bn();
+      const amount = random32bn();
+
+      await cryptoChemical.mint(beneficiary, id, amount, [], { from: manager });
+
+      await tryCatchRevert(
+        () => cryptoChemical.burn(
+          beneficiary,
+          id,
+          amount,
+          { from: owner },
+        ),
+        'burn: Only the manager',
+      );
+    });
+  });
+  describe('Function burnBatch', () => {
+    it('Function burnBatch', async () => {
+      const ids = [random32bn(), random32bn(), random32bn()];
+      const amounts = [random32bn(), random32bn(), random32bn()];
+
+      await cryptoChemical.mintBatch(beneficiary, ids, amounts, [], { from: manager });
+
+      const beneficiaryArray = [beneficiary, beneficiary, beneficiary];
+      const prevBal = await cryptoChemical.balanceOfBatch(beneficiaryArray, ids);
+
+      await cryptoChemical.burnBatch(
+        beneficiary,
+        ids,
+        amounts,
+        { from: manager },
+      );
+
+      const postAmounts = await cryptoChemical.balanceOfBatch(beneficiaryArray, ids);
+      expect(postAmounts[0]).to.eq.BN(prevBal[0].sub(amounts[0]));
+      expect(postAmounts[1]).to.eq.BN(prevBal[1].sub(amounts[1]));
+      expect(postAmounts[2]).to.eq.BN(prevBal[2].sub(amounts[2]));
+    });
+    it('Try burn a batch without being the manager', async () => {
+      const ids = [random32bn(), random32bn(), random32bn()];
+      const amounts = [random32bn(), random32bn(), random32bn()];
+
+      await cryptoChemical.mintBatch(beneficiary, ids, amounts, [], { from: manager });
+
+      await tryCatchRevert(
+        () => cryptoChemical.burnBatch(
+          beneficiary,
+          ids,
+          amounts,
+          { from: owner },
+        ),
+        'burnBatch: Only the manager',
       );
     });
   });

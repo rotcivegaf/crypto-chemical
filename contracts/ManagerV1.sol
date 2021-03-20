@@ -23,6 +23,9 @@ contract ManagerV1 is Ownable, IManager {
     event BurnAtoms();
     event BurnBatchAtoms();
 
+    event Burn();
+    event BurnBatch();
+
     event CancelHash();
 
     string public constant versionName = "Atoms";
@@ -250,8 +253,7 @@ contract ManagerV1 is Ownable, IManager {
     }
 
     function burnAtoms(
-        address _account,
-        address _to,
+        address _beneficiary,
         uint256 _atomId,
         uint256 _amount
     ) external {
@@ -260,7 +262,7 @@ contract ManagerV1 is Ownable, IManager {
         uint256 idOnAtomsNeutron = _atomId - START_ATOMS_IDS;
         uint256 _atomicNumber = idOnAtomsNeutron + 1;
 
-        cryptoChemical.burn(_account, _atomId, _amount);
+        cryptoChemical.burn(msg.sender, _atomId, _amount);
 
         uint256 neutron = _getNeutron(idOnAtomsNeutron);
 
@@ -274,7 +276,7 @@ contract ManagerV1 is Ownable, IManager {
 
         cryptoChemical.safeBatchTransferFrom(
             address(this),
-            _to,
+            _beneficiary,
             MATS_IDS,
             amounts,
             ""
@@ -284,13 +286,66 @@ contract ManagerV1 is Ownable, IManager {
     }
 
     function burnBatchAtoms(
-        address _account,
+        address _beneficiary,
         uint256[] memory _ids,
         uint256[] memory _amounts
     ) external {
-        // TODO
+        uint256 idsLength = _ids.length;
+        uint256 idOnAtomsNeutron;
+        uint256 _atomicNumber;
+        uint256 totNeutron;
+        uint256 totEnergy;
+        uint256 totAtomicNumber;
+        uint256 neutron;
+
+        for (uint256 i = 0; i < idsLength; ++i){
+            require(_ids[i] >= START_ATOMS_IDS && _ids[i] < END_ATOMS_IDS, "burnBatchAtoms: Should be an atom");
+
+            idOnAtomsNeutron = _ids[i] - START_ATOMS_IDS;
+            _atomicNumber = idOnAtomsNeutron + 1;
+            neutron = _getNeutron(idOnAtomsNeutron);
+
+            totEnergy = totEnergy.add(_getEnergy(BASE_ENERGY_MINT_ATOM, _atomicNumber, neutron).mul(_amounts[i]));
+            totNeutron = totNeutron.add(neutron.mul(_amounts[i]));
+            totAtomicNumber = totAtomicNumber.add(_atomicNumber.mul(_amounts[i]));
+        }
+
+        cryptoChemical.safeTransferFrom(msg.sender, address(this), totEnergy.div(2));
+
+        uint256[] memory amounts = new uint256[](3);
+        amounts[NEUTRON]  = totNeutron;
+        amounts[PROTON]   = totAtomicNumber;
+        amounts[ELECTRON] = totAtomicNumber;
+
+        cryptoChemical.safeBatchTransferFrom(
+            address(this),
+            _beneficiary,
+            MATS_IDS,
+            amounts,
+            ""
+        );
+
+        cryptoChemical.burnBatch(msg.sender, _ids, _amounts);
 
         emit BurnBatchAtoms();
+    }
+
+    function burn(
+        uint256 _id,
+        uint256 _amount
+    ) external {
+        cryptoChemical.burn(msg.sender, _id, _amount);
+
+        emit Burn();
+    }
+
+    function burnBatch(
+        uint256[] memory _ids,
+        uint256[] memory _amounts
+    ) external {
+        cryptoChemical.burnBatch(msg.sender, _ids, _amounts);
+
+        emit BurnBatch();
     }
 
     function getEnergyNeutron(uint256 _base, uint256 _atomId) external view returns(uint256 energy, uint256 neutron) {
