@@ -369,23 +369,21 @@ contract ManagerV1 is Ownable, IManager {
         return _base + _atomicNumber * 2 * _neutron;
     }
 
-    function onERC1155Received(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external returns(bytes4) {
-        return 0xf23a6e61;
-    }
-
     function onERC1155BatchReceived(
         address,
         address,
-        uint256[] calldata,
+        uint256[] calldata _ids,
         uint256[] calldata,
         bytes calldata
     ) external returns(bytes4) {
+        require(
+            _ids.length == MATS_IDS.length &&
+                _ids[0] == MATS_IDS[0] &&
+                _ids[1] == MATS_IDS[1] &&
+                _ids[2] == MATS_IDS[2],
+            "onERC1155BatchReceived: Only recives MATS_IDS"
+        );
+
         return 0xbc197c81;
     }
 
