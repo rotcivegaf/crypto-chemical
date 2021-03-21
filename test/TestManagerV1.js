@@ -66,7 +66,6 @@ contract('ManagerV1', (accounts) => {
   it('Function Constructor', async () => {
     const newManagerV1 = await ManagerV1.new(cryptoChemical.address, { from: owner });
 
-    assert.equal(await newManagerV1.versionName(), 'Atoms');
     assert.equal(await newManagerV1.cryptoChemical(), cryptoChemical.address);
 
     assert.equal(await newManagerV1.NEUTRON(), 0);
