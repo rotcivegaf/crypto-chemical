@@ -6,10 +6,9 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./CryptoChemical.sol";
 
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
-import "./interfaces/IManager.sol";
 
 
-contract ManagerV1 is Ownable, IManager {
+contract ManagerV1 is Ownable {
     using SafeERC20 for CryptoChemical;
     using SafeMath for uint256;
 
@@ -28,14 +27,11 @@ contract ManagerV1 is Ownable, IManager {
 
     event CancelHash();
 
-    string public constant versionName = "Atoms";
-
     CryptoChemical public immutable cryptoChemical;
 
     uint256 public constant NEUTRON  = 0;
     uint256 public constant PROTON   = 1;
     uint256 public constant ELECTRON = 2;
-    // ids => 3 - 120 to atoms
 
     uint256 public constant START_ATOMS_IDS  = 3;
     uint256 public constant END_ATOMS_IDS  = 121;
@@ -49,11 +45,10 @@ contract ManagerV1 is Ownable, IManager {
 
     constructor (CryptoChemical _cryptoChemical) {
         cryptoChemical = _cryptoChemical;
-        // A recipe
+
         // There are 118 atoms
         // Use a byte to represent the neutron for each atom
-        // Agroup 32 atoms in a id
-
+        // Agroup 32 atoms in a bytes32
        atomsNeutron[0] = 0x00020405060607080a0a0c0c0e0e101012161414181a1c1c1e1e201f23232729;
        atomsNeutron[1] = 0x2a2d2d3030323233343637393a3c3d404245474c4a4d4e51525252545458595d;
        atomsNeutron[2] = 0x5e6162636467686a6c6e6f72737576797b7d7e7e7d86888a8a8e8c9290969497;
