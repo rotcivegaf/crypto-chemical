@@ -33,4 +33,4 @@ These atoms can be burned and consume energy but return the particles
 
 In addition, the minted particles, the manager contract can mint atoms
 
-This contract storage the recipes of the atoms. Look in [RecipesV1.md](https://github.com/rotcivegaf/crypto-chemical/blob/master/RecipesV1.md.md)
+This contract storage the recipes of the atoms. Look in [RecipesV1.md](https://github.com/rotcivegaf/crypto-chemical/blob/master/RecipesV1.md)
