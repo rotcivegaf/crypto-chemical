@@ -1,11 +1,14 @@
-pragma solidity >=0.6.0 <0.8.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Ownable {
+    using ECDSA for bytes32;
+
     event SetManager(address _manager);
 
     event SignMintEnergy();
@@ -26,6 +29,8 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         manager = _manager;
         emit SetManager(_manager);
     }
+
+    // For Energy(ERC20)
 
     function mintEnergy(address _to, uint256 _amount) external onlyOwner {
         _mint(_to, _amount);
@@ -55,7 +60,7 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         canceledMsgHashes[msgHash] = true;
 
         require(
-            owner() == _recoveryOwner(msgHash, _ownerSignature),
+            owner() == msgHash.toEthSignedMessageHash().recover(_ownerSignature),
             "signMintEnergy: Invalid owner signature"
         );
 
@@ -74,6 +79,8 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
 
         _mint(_to, _id, _amount, _data);
     }
+
+    // For Energy(ERC1155)
 
     function mintBatch(
         address _to,
@@ -104,32 +111,6 @@ contract CryptoChemical is ERC20("Crypto Chemical Energy", "CCE"), ERC1155, Owna
         require(msg.sender == manager, "burnBatch: Only the manager");
 
         _burnBatch(_account, _ids, _amounts);
-    }
-
-    function _recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
-        assembly {
-            r := mload(add(_signature, 32))
-            s := mload(add(_signature, 64))
-            v := and(mload(add(_signature, 65)), 255)
-        }
-
-        if (v < 27) v += 27;
-
-        return ecrecover(
-            keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n32",
-                    _msgHash
-                )
-            ),
-            v,
-            r,
-            s
-        );
     }
 
     function cancelSignHash(

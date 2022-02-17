@@ -1,16 +1,16 @@
-pragma solidity >=0.6.0 <0.8.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./CryptoChemical.sol";
 
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 
 contract ManagerV1 is Ownable {
+    using ECDSA for bytes32;
     using SafeERC20 for CryptoChemical;
-    using SafeMath for uint256;
 
     event MintMats();
     event SignMintMats();
@@ -102,7 +102,7 @@ contract ManagerV1 is Ownable {
         canceledMsgHashes[msgHash] = true;
 
         require(
-            owner() == _recoveryOwner(msgHash, _ownerSignature),
+            owner() == msgHash.toEthSignedMessageHash().recover(_ownerSignature),
             "signMintMats: Invalid owner signature"
         );
 
@@ -160,7 +160,7 @@ contract ManagerV1 is Ownable {
         canceledMsgHashes[msgHash] = true;
 
         require(
-            owner() == _recoveryOwner(msgHash, _ownerSignature),
+            owner() == msgHash.toEthSignedMessageHash().recover(_ownerSignature),
             "signMintBatchMats: Invalid owner signature"
         );
 
@@ -181,11 +181,15 @@ contract ManagerV1 is Ownable {
 
         uint256 neutron = _getNeutron(idOnAtomsNeutron);
 
-        cryptoChemical.safeTransferFrom(msg.sender, address(this), _getEnergy(BASE_ENERGY_MINT_ATOM, _atomicNumber, neutron).mul(_amount));
+        cryptoChemical.safeTransferFrom(
+            msg.sender,
+            address(this),
+            _getEnergy(BASE_ENERGY_MINT_ATOM, _atomicNumber, neutron) * _amount
+        );
 
         uint256[] memory amounts = new uint256[](3);
-        amounts[NEUTRON]  = neutron.mul(_amount);
-        uint256 aux = _atomicNumber.mul(_amount);
+        amounts[NEUTRON]  = neutron * _amount;
+        uint256 aux = _atomicNumber * _amount;
         amounts[PROTON]   = aux;
         amounts[ELECTRON] = aux;
 
@@ -205,44 +209,21 @@ contract ManagerV1 is Ownable {
     function mintBatchAtoms(
         address _to,
         uint256[] memory _atomsIds,
-        uint256[] memory _amounts
+        uint256[] memory _atomsAmounts
     ) external {
-        uint256 idsLength = _atomsIds.length;
-        uint256 idOnAtomsNeutron;
-        uint256 _atomicNumber;
-        uint256 totNeutron;
-        uint256 totEnergy;
-        uint256 totAtomicNumber;
-        uint256 neutron;
+        (uint256[] memory matAmounts, uint256 energyAmount) = _calcAmounts(_atomsIds, _atomsAmounts);
 
-        for (uint256 i = 0; i < idsLength; ++i){
-            require(_atomsIds[i] >= START_ATOMS_IDS && _atomsIds[i] < END_ATOMS_IDS, "mintBatchAtoms: Should be an atom");
-
-            idOnAtomsNeutron = _atomsIds[i] - START_ATOMS_IDS;
-            _atomicNumber = idOnAtomsNeutron + 1;
-            neutron = _getNeutron(idOnAtomsNeutron);
-
-            totEnergy = totEnergy.add(_getEnergy(BASE_ENERGY_MINT_ATOM, _atomicNumber, neutron).mul(_amounts[i]));
-            totNeutron = totNeutron.add(neutron.mul(_amounts[i]));
-            totAtomicNumber = totAtomicNumber.add(_atomicNumber.mul(_amounts[i]));
-        }
-
-        cryptoChemical.safeTransferFrom(msg.sender, address(this), totEnergy);
-
-        uint256[] memory amounts = new uint256[](3);
-        amounts[NEUTRON]  = totNeutron;
-        amounts[PROTON]   = totAtomicNumber;
-        amounts[ELECTRON] = totAtomicNumber;
+        cryptoChemical.safeTransferFrom(msg.sender, address(this), energyAmount);
 
         cryptoChemical.safeBatchTransferFrom(
             msg.sender,
             address(this),
             MATS_IDS,
-            amounts,
+            matAmounts,
             ""
         );
 
-        cryptoChemical.mintBatch(_to, _atomsIds, _amounts, "");
+        cryptoChemical.mintBatch(_to, _atomsIds, _atomsAmounts, "");
 
         emit MintBatchAtoms();
     }
@@ -261,11 +242,15 @@ contract ManagerV1 is Ownable {
 
         uint256 neutron = _getNeutron(idOnAtomsNeutron);
 
-        cryptoChemical.safeTransferFrom(msg.sender, address(this), _getEnergy(BASE_ENERGY_BURN_ATOM, _atomicNumber, neutron).div(2).mul(_amount));
+        cryptoChemical.safeTransferFrom(
+            msg.sender,
+            address(this),
+            (_getEnergy(BASE_ENERGY_BURN_ATOM, _atomicNumber, neutron) / 2) * _amount
+        );
 
         uint256[] memory amounts = new uint256[](3);
-        amounts[NEUTRON]  = neutron.mul(_amount);
-        uint256 aux = _atomicNumber.mul(_amount);
+        amounts[NEUTRON]  = neutron * _amount;
+        uint256 aux = _atomicNumber * _amount;
         amounts[PROTON]   = aux;
         amounts[ELECTRON] = aux;
 
@@ -282,45 +267,22 @@ contract ManagerV1 is Ownable {
 
     function burnBatchAtoms(
         address _beneficiary,
-        uint256[] memory _ids,
-        uint256[] memory _amounts
+        uint256[] memory _atomsIds,
+        uint256[] memory _atomsAmounts
     ) external {
-        uint256 idsLength = _ids.length;
-        uint256 idOnAtomsNeutron;
-        uint256 _atomicNumber;
-        uint256 totNeutron;
-        uint256 totEnergy;
-        uint256 totAtomicNumber;
-        uint256 neutron;
+        (uint256[] memory matAmounts, uint256 energyAmount) = _calcAmounts(_atomsIds, _atomsAmounts);
 
-        for (uint256 i = 0; i < idsLength; ++i){
-            require(_ids[i] >= START_ATOMS_IDS && _ids[i] < END_ATOMS_IDS, "burnBatchAtoms: Should be an atom");
-
-            idOnAtomsNeutron = _ids[i] - START_ATOMS_IDS;
-            _atomicNumber = idOnAtomsNeutron + 1;
-            neutron = _getNeutron(idOnAtomsNeutron);
-
-            totEnergy = totEnergy.add(_getEnergy(BASE_ENERGY_MINT_ATOM, _atomicNumber, neutron).mul(_amounts[i]));
-            totNeutron = totNeutron.add(neutron.mul(_amounts[i]));
-            totAtomicNumber = totAtomicNumber.add(_atomicNumber.mul(_amounts[i]));
-        }
-
-        cryptoChemical.safeTransferFrom(msg.sender, address(this), totEnergy.div(2));
-
-        uint256[] memory amounts = new uint256[](3);
-        amounts[NEUTRON]  = totNeutron;
-        amounts[PROTON]   = totAtomicNumber;
-        amounts[ELECTRON] = totAtomicNumber;
+        cryptoChemical.safeTransferFrom(msg.sender, address(this), energyAmount / 2);
 
         cryptoChemical.safeBatchTransferFrom(
             address(this),
             _beneficiary,
             MATS_IDS,
-            amounts,
+            matAmounts,
             ""
         );
 
-        cryptoChemical.burnBatch(msg.sender, _ids, _amounts);
+        cryptoChemical.burnBatch(msg.sender, _atomsIds, _atomsAmounts);
 
         emit BurnBatchAtoms();
     }
@@ -382,37 +344,40 @@ contract ManagerV1 is Ownable {
         return 0xbc197c81;
     }
 
-    function _recoveryOwner(bytes32 _msgHash, bytes memory _signature) internal pure returns (address) {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
-        assembly {
-            r := mload(add(_signature, 32))
-            s := mload(add(_signature, 64))
-            v := and(mload(add(_signature, 65)), 255)
-        }
-
-        if (v < 27) v += 27;
-
-        return ecrecover(
-            keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n32",
-                    _msgHash
-                )
-            ),
-            v,
-            r,
-            s
-        );
-    }
-
     function cancelSignHash(
         bytes32 _msgHash
     ) external onlyOwner {
         canceledMsgHashes[_msgHash] = true;
 
         emit CancelHash();
+    }
+
+    function _calcAmounts(uint256[] memory _atomsIds, uint256[] memory _amounts) internal view returns(
+        uint256[] memory amounts,
+        uint256 energyAmount
+    ) {
+        uint256 idsLength = _atomsIds.length;
+        uint256 idOnAtomsNeutron;
+        uint256 _atomicNumber;
+        uint256 totNeutron;
+        uint256 totAtomicNumber;
+        uint256 neutron;
+
+        for (uint256 i = 0; i < idsLength; ++i){
+            require(_atomsIds[i] >= START_ATOMS_IDS && _atomsIds[i] < END_ATOMS_IDS, "_calcAmounts: Should be an atom");
+
+            idOnAtomsNeutron = _atomsIds[i] - START_ATOMS_IDS;
+            _atomicNumber = idOnAtomsNeutron + 1;
+            neutron = _getNeutron(idOnAtomsNeutron);
+
+            energyAmount += _getEnergy(BASE_ENERGY_MINT_ATOM, _atomicNumber, neutron) * _amounts[i];
+            totNeutron += neutron * _amounts[i];
+            totAtomicNumber += _atomicNumber * _amounts[i];
+        }
+
+        amounts = new uint256[](3);
+        amounts[NEUTRON]  = totNeutron;
+        amounts[PROTON]   = totAtomicNumber;
+        amounts[ELECTRON] = totAtomicNumber;
     }
 }
